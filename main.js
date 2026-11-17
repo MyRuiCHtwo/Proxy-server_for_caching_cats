@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { once } from 'node:events';
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { buffer } from 'node:stream/consumers';
 import { fileURLToPath } from 'node:url';
 import { Command } from 'commander';
 import superagent from 'superagent';
@@ -79,6 +80,17 @@ async function getImage(response, code, filePath) {
   response.end(image);
 }
 
+// Consume the raw request stream as a Buffer and replace the cached JPEG without re-encoding it.
+async function putImage(request, response, filePath) {
+  const image = await buffer(request);
+  if (image.length === 0) {
+    sendText(response, 400, 'Send the JPEG bytes in the request body.');
+    return;
+  }
+  await saveImage(filePath, image);
+  sendText(response, 201, 'Image saved to the cache.');
+}
+
 // Check the configuration and wait for Node to bind the listening socket.
 async function start() {
   program.parse();
@@ -113,8 +125,10 @@ async function start() {
 
       if (request.method === 'GET') {
         await getImage(response, code, filePath);
+      } else if (request.method === 'PUT') {
+        await putImage(request, response, filePath);
       } else {
-        sendText(response, 405, 'Method not allowed.', { Allow: 'GET' });
+        sendText(response, 405, 'Method not allowed.', { Allow: 'GET, PUT' });
       }
     } catch (error) {
       console.error('Request failed:', error.message);
