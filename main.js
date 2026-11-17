@@ -1,9 +1,11 @@
 import http from 'node:http';
+import { randomUUID } from 'node:crypto';
 import { once } from 'node:events';
-import { mkdir } from 'node:fs/promises';
-import { isAbsolute, relative, resolve, sep } from 'node:path';
+import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Command } from 'commander';
+import superagent from 'superagent';
 
 // Resolve cache paths relative to the project, regardless of the shell's working directory.
 const projectDir = fileURLToPath(new URL('.', import.meta.url));
@@ -20,6 +22,61 @@ const program = new Command()
 function sendText(response, status, message, headers) {
   response.writeHead(status, { 'Content-Type': 'text/plain; charset=utf-8', ...headers });
   response.end(message + '\n');
+}
+
+// Publish a complete file in one rename. Remove the temporary file if writing or renaming fails.
+async function saveImage(filePath, image) {
+  const temporaryPath = filePath + '.' + randomUUID() + '.tmp';
+  try {
+    await writeFile(temporaryPath, image, { flag: 'wx' });
+    await rename(temporaryPath, filePath);
+  } catch (error) {
+    await rm(temporaryPath, { force: true });
+    throw error;
+  }
+}
+
+// Fetch a JPEG as a Buffer. A failed request or an unexpected upstream reply means no image.
+async function fetchImage(code) {
+  try {
+    const upstream = await superagent.get(`https://http.cat/${code}`)
+      .timeout({ response: 5000, deadline: 10000 })
+      .redirects(0)
+      .maxResponseSize(5 * 1024 * 1024);
+    if (upstream.status === 200 && upstream.type === 'image/jpeg' &&
+        Buffer.isBuffer(upstream.body) && upstream.body.length > 0) {
+      return upstream.body;
+    }
+  } catch (error) {
+    console.error(`http.cat /${code}:`, error.message);
+  }
+  return null;
+}
+
+// Read from disk first, fetching and saving the original bytes only on a cache miss.
+async function getImage(response, code, filePath) {
+  let image;
+  let source = 'cache';
+  try {
+    image = await readFile(filePath);
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+    source = 'http.cat';
+    image = await fetchImage(code);
+    if (!image) {
+      sendText(response, 404, 'Image unavailable from http.cat.');
+      return;
+    }
+    await saveImage(filePath, image);
+  }
+
+  response.writeHead(200, {
+    'Content-Type': 'image/jpeg',
+    'Content-Length': image.length,
+    'X-Image-Source': source,
+    'Cache-Control': 'no-store',
+  });
+  response.end(image);
 }
 
 // Check the configuration and wait for Node to bind the listening socket.
@@ -43,7 +100,22 @@ async function start() {
     try {
       // Recursive mkdir also handles concurrent first requests and a cache removed between runs.
       await mkdir(cacheDir, { recursive: true });
-      sendText(response, 404, 'Image route not found.');
+
+      // Only the pathname is used as a key; the code must be exactly three decimal digits.
+      const pathname = request.url.split('?', 1)[0];
+      const route = /^\/([1-5]\d{2})$/.exec(pathname);
+      if (!route) {
+        sendText(response, 404, 'Use an image route such as /418.');
+        return;
+      }
+      const code = route[1];
+      const filePath = join(cacheDir, code + '.jpg');
+
+      if (request.method === 'GET') {
+        await getImage(response, code, filePath);
+      } else {
+        sendText(response, 405, 'Method not allowed.', { Allow: 'GET' });
+      }
     } catch (error) {
       console.error('Request failed:', error.message);
       sendText(response, 500, 'Unable to access the image cache.');
