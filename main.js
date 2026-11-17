@@ -149,7 +149,7 @@ async function start() {
       const pathname = request.url.split('?', 1)[0];
       const route = /^\/([1-5]\d{2})$/.exec(pathname);
       if (!route) {
-        sendText(response, 404, 'Use an image route such as /418.');
+        sendText(response, 404, 'Use an image route such as /451.');
         return;
       }
       const code = route[1];

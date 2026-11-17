@@ -1,0 +1,18 @@
+$kind: http-request
+url: "{{baseUrl}}/451"
+method: GET
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status is 200", function () {
+          pm.response.to.have.status(200);
+      });
+      pm.test("Content-Type is image/jpeg", function () {
+          pm.expect(pm.response.headers.get("Content-Type")).to.eql("image/jpeg");
+      });
+      pm.test("X-Image-Source is cache", function () {
+          pm.expect(pm.response.headers.get("X-Image-Source")).to.eql("cache");
+      });
+      console.info("cache GET /451:", pm.response.responseTime, "ms");
+    language: text/javascript
+order: 2000

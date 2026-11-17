@@ -1,0 +1,7 @@
+# Use this workspace to collaborate
+workspace:
+  id: 552db08d-8c39-49f5-845d-b007d49c2c8e
+
+localResources:
+  collections:
+    - ../Lab 5 - HTTP Cat Cache Proxy

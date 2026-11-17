@@ -1,0 +1,20 @@
+$kind: http-request
+url: "{{baseUrl}}/451"
+method: GET
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status is 200", function () {
+          pm.response.to.have.status(200);
+      });
+      pm.test("Content-Type is image/jpeg", function () {
+          pm.expect(pm.response.headers.get("Content-Type")).to.eql("image/jpeg");
+      });
+      pm.test("X-Image-Source is cache", function () {
+          pm.expect(pm.response.headers.get("X-Image-Source")).to.eql("cache");
+      });
+      pm.test("JPEG length matches the PUT fixture", function () {
+          pm.expect(Number(pm.response.headers.get("Content-Length"))).to.eql(Number(pm.collectionVariables.get("fixtureBytes")));
+      });
+    language: text/javascript
+order: 4000

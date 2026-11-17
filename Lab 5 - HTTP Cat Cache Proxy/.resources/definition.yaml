@@ -1,0 +1,5 @@
+$kind: collection
+description: Run the requests in order from a fresh cache. Both runs finish with 451 removed. Set the Postman working directory to the repository root for the binary fixture.
+variables:
+  baseUrl: http://127.0.0.1:3000
+  fixtureBytes: "18062"

@@ -1,0 +1,17 @@
+$kind: http-request
+url: "{{baseUrl}}/299"
+method: GET
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status is 404", function () {
+          pm.response.to.have.status(404);
+      });
+      pm.test("Content-Type is text/plain; charset=utf-8", function () {
+          pm.expect(pm.response.headers.get("Content-Type")).to.eql("text/plain; charset=utf-8");
+      });
+      pm.test("X-Image-Source is absent", function () {
+          pm.expect(pm.response.headers.has("X-Image-Source")).to.be.false;
+      });
+    language: text/javascript
+order: 7000

@@ -1,12 +1,12 @@
 {
   "info": {
     "name": "Lab 5 - HTTP Cat Cache Proxy",
-    "description": "Run the requests in order from a fresh cache. Both runs finish with 418 removed. Set the Postman working directory to the repository root for the binary fixture.",
+    "description": "Run the requests in order from a fresh cache. Both runs finish with 451 removed. Set the Postman working directory to the repository root for the binary fixture.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
     {
-      "name": "GET 418 from http.cat",
+      "name": "GET 451 from http.cat",
       "event": [
         {
           "listen": "test",
@@ -22,7 +22,7 @@
               "pm.test(\"X-Image-Source is http.cat\", function () {",
               "    pm.expect(pm.response.headers.get(\"X-Image-Source\")).to.eql(\"http.cat\");",
               "});",
-              "console.info(\"http.cat GET /418:\", pm.response.responseTime, \"ms\");"
+              "console.info(\"http.cat GET /451:\", pm.response.responseTime, \"ms\");"
             ]
           }
         }
@@ -31,18 +31,18 @@
         "method": "GET",
         "header": [],
         "url": {
-          "raw": "{{baseUrl}}/418",
+          "raw": "{{baseUrl}}/451",
           "host": [
             "{{baseUrl}}"
           ],
           "path": [
-            "418"
+            "451"
           ]
         }
       }
     },
     {
-      "name": "GET 418 from cache",
+      "name": "GET 451 from cache",
       "event": [
         {
           "listen": "test",
@@ -58,7 +58,7 @@
               "pm.test(\"X-Image-Source is cache\", function () {",
               "    pm.expect(pm.response.headers.get(\"X-Image-Source\")).to.eql(\"cache\");",
               "});",
-              "console.info(\"cache GET /418:\", pm.response.responseTime, \"ms\");"
+              "console.info(\"cache GET /451:\", pm.response.responseTime, \"ms\");"
             ]
           }
         }
@@ -67,12 +67,12 @@
         "method": "GET",
         "header": [],
         "url": {
-          "raw": "{{baseUrl}}/418",
+          "raw": "{{baseUrl}}/451",
           "host": [
             "{{baseUrl}}"
           ],
           "path": [
-            "418"
+            "451"
           ]
         }
       }
@@ -103,16 +103,16 @@
         "body": {
           "mode": "file",
           "file": {
-            "src": "fixtures/put-cat.jpg"
+            "src": "fixtures/my_image.jpg"
           }
         },
         "url": {
-          "raw": "{{baseUrl}}/418",
+          "raw": "{{baseUrl}}/451",
           "host": [
             "{{baseUrl}}"
           ],
           "path": [
-            "418"
+            "451"
           ]
         }
       }
@@ -145,12 +145,12 @@
         "method": "GET",
         "header": [],
         "url": {
-          "raw": "{{baseUrl}}/418",
+          "raw": "{{baseUrl}}/451",
           "host": [
             "{{baseUrl}}"
           ],
           "path": [
-            "418"
+            "451"
           ]
         }
       }
@@ -174,12 +174,12 @@
         "method": "DELETE",
         "header": [],
         "url": {
-          "raw": "{{baseUrl}}/418",
+          "raw": "{{baseUrl}}/451",
           "host": [
             "{{baseUrl}}"
           ],
           "path": [
-            "418"
+            "451"
           ]
         }
       }
@@ -203,12 +203,12 @@
         "method": "DELETE",
         "header": [],
         "url": {
-          "raw": "{{baseUrl}}/418",
+          "raw": "{{baseUrl}}/451",
           "host": [
             "{{baseUrl}}"
           ],
           "path": [
-            "418"
+            "451"
           ]
         }
       }
@@ -270,12 +270,12 @@
         "method": "POST",
         "header": [],
         "url": {
-          "raw": "{{baseUrl}}/418",
+          "raw": "{{baseUrl}}/451",
           "host": [
             "{{baseUrl}}"
           ],
           "path": [
-            "418"
+            "451"
           ]
         }
       }
@@ -284,12 +284,12 @@
   "variable": [
     {
       "key": "baseUrl",
-      "value": "http://127.0.0.1:3127",
+      "value": "http://127.0.0.1:3000",
       "type": "string"
     },
     {
       "key": "fixtureBytes",
-      "value": "6225",
+      "value": "18062",
       "type": "string"
     }
   ]

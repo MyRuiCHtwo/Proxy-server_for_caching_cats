@@ -1,0 +1,17 @@
+$kind: http-request
+url: "{{baseUrl}}/451"
+method: PUT
+headers:
+  Content-Type: image/jpeg
+body:
+  type: file
+  content:
+    src: fixtures/my_image.jpg
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status is 201", function () {
+          pm.response.to.have.status(201);
+      });
+    language: text/javascript
+order: 3000
