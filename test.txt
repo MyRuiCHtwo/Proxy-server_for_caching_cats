@@ -1,0 +1,57 @@
+# Run from the project root in PowerShell. Pick a new cache subdirectory for a cold run.
+# Terminal 1
+npm ci
+npm start -- -h 127.0.0.1 -p 3127 -c cache/curl-demo
+
+# Terminal 2. A fresh directory should be absent before the first request.
+$base = 'http://127.0.0.1:3127'
+$cacheDir = 'cache/curl-demo'
+$format = '\nHTTP %{http_code} total %{time_total}s\n'
+Test-Path -LiteralPath $cacheDir
+Test-Path -LiteralPath 'fixtures/put-cat.jpg' -PathType Leaf
+
+# GET from http.cat and then from disk. Expect 200 with different sources and equal hashes.
+curl.exe -sS --max-time 15 -D - -o "$cacheDir/first.jpg" -w $format "$base/418"
+curl.exe -sS --max-time 15 -D - -o "$cacheDir/repeat.jpg" -w $format "$base/418"
+Get-FileHash -LiteralPath "$cacheDir/first.jpg","$cacheDir/repeat.jpg","$cacheDir/418.jpg"
+
+# Binary PUT and read-back. The fixture path is relative to the current directory.
+curl.exe -sS --max-time 15 -i -X PUT -H 'Content-Type: image/jpeg' --data-binary '@fixtures/put-cat.jpg' -w $format "$base/418"
+curl.exe -sS --max-time 15 -D - -o "$cacheDir/uploaded.jpg" -w $format "$base/418"
+Get-FileHash -LiteralPath 'fixtures/put-cat.jpg',"$cacheDir/uploaded.jpg","$cacheDir/418.jpg"
+
+# Empty PUT must leave the previous JPEG in place.
+curl.exe -sS --max-time 15 -i -X PUT -w $format "$base/418"
+curl.exe -sS --max-time 15 -D - -o "$cacheDir/after-empty.jpg" -w $format "$base/418"
+Get-FileHash -LiteralPath 'fixtures/put-cat.jpg',"$cacheDir/after-empty.jpg"
+
+# DELETE existing and absent files, then fetch again. Expected 200, 404, and 200.
+curl.exe -sS --max-time 15 -i -X DELETE -w $format "$base/418"
+Test-Path -LiteralPath "$cacheDir/418.jpg"
+curl.exe -sS --max-time 15 -i -X DELETE -w $format "$base/418"
+curl.exe -sS --max-time 15 -D - -o "$cacheDir/refetched.jpg" -w $format "$base/418"
+
+# Missing upstream image, invalid route, and unsupported methods.
+curl.exe -sS --max-time 15 -i -w $format "$base/299"
+Test-Path -LiteralPath "$cacheDir/299.jpg"
+curl.exe -sS --max-time 15 -i -w $format "$base/418/extra"
+curl.exe -sS --max-time 15 -i -X POST -w $format "$base/418"
+curl.exe -sS --max-time 15 -I -w $format "$base/418"
+curl.exe -sS --max-time 15 -i -X POST -w $format "$base/"
+
+# Simulate a local filesystem error on a dedicated test path. Expect 500.
+New-Item -ItemType Directory -Path "$cacheDir/500.jpg"
+curl.exe -sS --max-time 15 -i -w $format "$base/500"
+Remove-Item -LiteralPath "$cacheDir/500.jpg"
+
+# Parallel cold GETs. Expect two 200 responses with one http.cat and one cache source.
+curl.exe -sS --max-time 15 -i -X DELETE -w $format "$base/418"
+$one = @('-sS','--max-time','15','-D',"$cacheDir/p1.txt",'-o',"$cacheDir/p1.jpg","$base/418")
+$two = @('-sS','--max-time','15','-D',"$cacheDir/p2.txt",'-o',"$cacheDir/p2.jpg","$base/418")
+curl.exe --parallel --parallel-immediate @one --next @two
+Get-Content -LiteralPath "$cacheDir/p1.txt","$cacheDir/p2.txt"
+Get-FileHash -LiteralPath "$cacheDir/p1.jpg","$cacheDir/p2.jpg","$cacheDir/418.jpg"
+curl.exe -sS --max-time 15 -D - -o "$cacheDir/query.jpg" -w $format "$base/418?demo=1"
+
+# Direct network check used before running the proxy tests.
+curl.exe -sS -I --max-time 12 https://http.cat/418
