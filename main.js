@@ -1,7 +1,7 @@
 import http from 'node:http';
 import { randomUUID } from 'node:crypto';
 import { once } from 'node:events';
-import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, rm, unlink, writeFile } from 'node:fs/promises';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { buffer } from 'node:stream/consumers';
 import { fileURLToPath } from 'node:url';
@@ -91,6 +91,18 @@ async function putImage(request, response, filePath) {
   sendText(response, 201, 'Image saved to the cache.');
 }
 
+// Delete a cached file directly and report an absent file without contacting http.cat.
+async function deleteImage(response, filePath) {
+  try {
+    await unlink(filePath);
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+    sendText(response, 404, 'Image is not in the cache.');
+    return;
+  }
+  sendText(response, 200, 'Image removed from the cache.');
+}
+
 // Check the configuration and wait for Node to bind the listening socket.
 async function start() {
   program.parse();
@@ -127,8 +139,10 @@ async function start() {
         await getImage(response, code, filePath);
       } else if (request.method === 'PUT') {
         await putImage(request, response, filePath);
+      } else if (request.method === 'DELETE') {
+        await deleteImage(response, filePath);
       } else {
-        sendText(response, 405, 'Method not allowed.', { Allow: 'GET, PUT' });
+        sendText(response, 405, 'Method not allowed.', { Allow: 'GET, PUT, DELETE' });
       }
     } catch (error) {
       console.error('Request failed:', error.message);
