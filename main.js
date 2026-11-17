@@ -10,6 +10,10 @@ import superagent from 'superagent';
 
 // Resolve cache paths relative to the project, regardless of the shell's working directory.
 const projectDir = fileURLToPath(new URL('.', import.meta.url));
+const allowedMethods = ['GET', 'PUT', 'DELETE'];
+
+// Track active operations by HTTP code so concurrent requests share a consistent disk cache.
+const activeImages = new Map();
 
 // Use --help for help so that -h remains available for the required host option.
 const program = new Command()
@@ -103,6 +107,16 @@ async function deleteImage(response, filePath) {
   sendText(response, 200, 'Image removed from the cache.');
 }
 
+// Wait for the previous operation on this code, then reserve it until the caller releases it.
+async function lockImage(code) {
+  while (activeImages.has(code)) {
+    await activeImages.get(code);
+  }
+  const lock = Promise.withResolvers();
+  activeImages.set(code, lock.promise);
+  return lock;
+}
+
 // Check the configuration and wait for Node to bind the listening socket.
 async function start() {
   program.parse();
@@ -125,7 +139,13 @@ async function start() {
       // Recursive mkdir also handles concurrent first requests and a cache removed between runs.
       await mkdir(cacheDir, { recursive: true });
 
-      // Only the pathname is used as a key; the code must be exactly three decimal digits.
+      // Reject unimplemented methods before selecting an image route.
+      if (!allowedMethods.includes(request.method)) {
+        sendText(response, 405, 'Method not allowed.', { Allow: allowedMethods.join(', ') });
+        return;
+      }
+
+      // Only a three-digit status code in the pathname can become part of a filename.
       const pathname = request.url.split('?', 1)[0];
       const route = /^\/([1-5]\d{2})$/.exec(pathname);
       if (!route) {
@@ -135,18 +155,26 @@ async function start() {
       const code = route[1];
       const filePath = join(cacheDir, code + '.jpg');
 
-      if (request.method === 'GET') {
-        await getImage(response, code, filePath);
-      } else if (request.method === 'PUT') {
-        await putImage(request, response, filePath);
-      } else if (request.method === 'DELETE') {
-        await deleteImage(response, filePath);
-      } else {
-        sendText(response, 405, 'Method not allowed.', { Allow: 'GET, PUT, DELETE' });
+      // Requests for different codes can still operate concurrently.
+      const lock = await lockImage(code);
+      try {
+        if (request.method === 'GET') {
+          await getImage(response, code, filePath);
+        } else if (request.method === 'PUT') {
+          await putImage(request, response, filePath);
+        } else {
+          await deleteImage(response, filePath);
+        }
+      } finally {
+        activeImages.delete(code);
+        lock.resolve();
       }
     } catch (error) {
+      // A disconnected client cannot receive an error response.
       console.error('Request failed:', error.message);
-      sendText(response, 500, 'Unable to access the image cache.');
+      if (!response.destroyed) {
+        sendText(response, 500, 'Unable to process the image request.');
+      }
     }
   });
 
